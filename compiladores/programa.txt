@@ -1,13 +1,11 @@
-# Teste completo do Analisador Lexico MiniPython
+# Teste de Sucesso - Etapa 3
 numero = input("Digite um valor: ")
-lista_primos = [2, 3, 5]
 
 if numero >= 10:
     print "Maior ou igual a dez"
 else:
-    print 'Menor'
+    print "Menor"
 
 is_valid = True
-while is_valid != False:
-    numero = numero + 1 ** 2
-    @variavel = 0
+while is_valid == True:
+    numero = numero + 1

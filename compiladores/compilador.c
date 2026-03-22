@@ -1,3 +1,9 @@
+/* ===================================================================
+ * PROJETO COMPILADORES - FASE 1 (Análise Léxica e Sintática)
+ * * Aluno(s): Matheus Veiga Bacetic Joaquim RA: 10425638 | Beatriz Barbosa RA: 10354067
+ * * Compilação: gcc -Wall -Wno-unused-result -g -Og compilador.c -o compilador
+ * =================================================================== */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +36,7 @@ typedef struct {
 FILE *fonte;
 FILE *saida; // Arquivo para gravar os tokens gerados
 int linhaAtual = 1;
+TInfoAtomo lookahead;
 
 // 3. Protótipos das Funções
 void iniciarAnalisador(char *nomeArquivo);
@@ -40,9 +47,25 @@ char* nomeDoTipo(TAtomo tipo);
 void erroLexico(char *lexema);
 TAtomo classificarLexema(char *lexema);
 
+// --- Protótipos do Analisador Sintático ---
+void consome(TAtomo tipo_esperado);
+void erroSintatico(char *mensagem);
+void programa();
+void comando();
+void atribuicao();
+void comandoPrint();
+void comandoInput();
+void condicional();
+void repeticao();
+void listaExpressoes();
+void expressao();
+void expSimples();
+void termo();
+void fator();
+void estruturaLista();
+
 // --- FUNÇÃO PRINCIPAL ---
 int main(int argc, char *argv[]) {
-    // O projeto exige que o nome do arquivo seja passado por linha de comando
     if (argc < 2) {
         printf("Uso: %s <arquivo_fonte.py>\n", argv[0]);
         return 1;
@@ -50,20 +73,19 @@ int main(int argc, char *argv[]) {
 
     iniciarAnalisador(argv[1]);
 
-    TInfoAtomo atomo;
+    // Pega o primeiro token para iniciar a análise sintática
+    lookahead = obter_atomo();
     
-    // Loop principal: pede tokens até encontrar o fim do arquivo (EOS) ou um ERRO
-    do {
-        atomo = obter_atomo();
-        
-        if (atomo.tipo == ERRO) {
-            erroLexico(atomo.lexema);
-            break; // O processo deve ser finalizado em caso de erro léxico
-        } else if (atomo.tipo != EOS) {
-            imprimirToken(atomo);
-        }
-        
-    } while (atomo.tipo != EOS);
+    // Inicia a análise sintática pela raiz da gramática
+    programa();
+    
+    // Se a função programa() terminar sem disparar erros, o código está correto!
+    if (lookahead.tipo == EOS) {
+        printf("Análise Sintática concluída com sucesso! Nenhum erro encontrado.\n");
+        fprintf(saida, "Análise Sintática concluída com sucesso!\n");
+    } else {
+        erroSintatico("Código extra encontrado após o fim do programa principal.");
+    }
 
     fecharAnalisador();
     return 0;
@@ -294,4 +316,239 @@ TAtomo classificarLexema(char *lexema) {
         strcmp(lexema, "is") == 0) return OPERADOR_LOGICO;
 
     return IDENTIFICADOR;
+}
+// =========================================================
+//               ANALISADOR SINTÁTICO (ETAPA 3)
+// =========================================================
+
+void erroSintatico(char *mensagem) {
+    printf("ERRO SINTÁTICO\n");
+    printf("Linha: %d\n", lookahead.linha);
+    printf("Token incorreto: %s\n", lookahead.lexema);
+    printf("Detalhe: %s\n", mensagem);
+    
+    fprintf(saida, "ERRO SINTÁTICO na linha %d: token incorreto '%s'. %s\n", 
+            lookahead.linha, lookahead.lexema, mensagem);
+            
+    fecharAnalisador();
+    exit(1); // Encerra o processo imediatamente, conforme especificação [cite: 147]
+}
+
+void consome(TAtomo tipo_esperado) {
+    if (lookahead.tipo == tipo_esperado) {
+        // Se o token é o esperado, "consome" ele e pega o próximo [cite: 8, 16]
+        lookahead = obter_atomo();
+    } else {
+        // Se não for, dispara o erro sintático
+        char mensagemErro[100];
+        sprintf(mensagemErro, "Esperava token do tipo %s, mas encontrou %s", 
+                nomeDoTipo(tipo_esperado), nomeDoTipo(lookahead.tipo));
+        erroSintatico(mensagemErro);
+    }
+}
+
+// Regra: Programa -> Comando Programa | ε
+void programa() {
+    // Enquanto não chegar no fim do arquivo, tenta ler comandos
+    while (lookahead.tipo != EOS) {
+        comando();
+    }
+}
+
+// Regra: Comando -> Atribuicao | Condicional | Repeticao | ComandoPrint | ComandoInput
+void comando() {
+    if (lookahead.tipo == IDENTIFICADOR) {
+        atribuicao();
+    } else if (lookahead.tipo == PALAVRA_RESERVADA) {
+        if (strcmp(lookahead.lexema, "print") == 0) {
+            comandoPrint();
+        } else if (strcmp(lookahead.lexema, "if") == 0) {
+            condicional();
+        } else if (strcmp(lookahead.lexema, "while") == 0 || strcmp(lookahead.lexema, "for") == 0) {
+            repeticao();
+        } else if (strcmp(lookahead.lexema, "return") == 0) {
+            consome(PALAVRA_RESERVADA);
+            expressao();
+        } else {
+            erroSintatico("Palavra reservada nao esperada no inicio de um comando.");
+        }
+    } else {
+        erroSintatico("Inicio de comando invalido.");
+    }
+}
+
+// Atualizacao da Atribuicao para aceitar Input
+void atribuicao() {
+    consome(IDENTIFICADOR);
+    if (strcmp(lookahead.lexema, "=") == 0) {
+        consome(DELIMITADOR);
+        if (lookahead.tipo == PALAVRA_RESERVADA && strcmp(lookahead.lexema, "input") == 0) {
+            comandoInput();
+        } else {
+            expressao();
+        }
+    } else {
+        erroSintatico("Esperava '=' para atribuicao.");
+    }
+}
+
+// Regra: ComandoPrint -> "print" ListaExpressoes
+void comandoPrint() {
+    consome(PALAVRA_RESERVADA); // consome o 'print'
+    listaExpressoes(); // Precisaremos criar essa função
+}
+
+// Regra: Expressao -> ExpSimples ( OperadorRelacional ExpSimples )?
+void expressao() {
+    expSimples();
+    if (lookahead.tipo == OPERADOR_RELACIONAL) {
+        consome(OPERADOR_RELACIONAL);
+        expSimples();
+    }
+}
+
+// Regra: ExpSimples -> Termo ( OperadorAritmetico Termo )*
+void expSimples() {
+    // Tratamento opcional de sinal unário (+ ou -)
+    if (lookahead.tipo == OPERADOR_ARITMETICO && 
+       (strcmp(lookahead.lexema, "+") == 0 || strcmp(lookahead.lexema, "-") == 0)) {
+        consome(OPERADOR_ARITMETICO);
+    }
+    
+    termo();
+    // Mudança de IF para WHILE para aceitar x = 1 + 2 + 3
+    while (lookahead.tipo == OPERADOR_ARITMETICO) {
+        consome(OPERADOR_ARITMETICO);
+        termo();
+    }
+}
+
+// Regra: Termo -> Fator | OperadorLogico Fator
+void termo() {
+    if (lookahead.tipo == OPERADOR_LOGICO && strcmp(lookahead.lexema, "not") == 0) {
+        consome(OPERADOR_LOGICO);
+    }
+    fator();
+    // Opcional: Adicionar loop aqui se quiser suportar multiplicacoes/divisoes em sequencia
+}
+
+// Regra: Fator -> IDENTIFICADOR | NUMERO_INTEIRO | BOOLEANO | "[" Lista "]" | "(" Expressao ")" | STRING_LITERAL
+void fator() {
+    if (lookahead.tipo == IDENTIFICADOR) {
+        consome(IDENTIFICADOR);
+    } else if (lookahead.tipo == NUMERO_INTEIRO) {
+        consome(NUMERO_INTEIRO);
+    } else if (lookahead.tipo == BOOLEANO) {
+        consome(BOOLEANO);
+    } else if (lookahead.tipo == STRING_LITERAL) {
+        consome(STRING_LITERAL);
+    } else if (lookahead.tipo == DELIMITADOR && strcmp(lookahead.lexema, "[") == 0) {
+        estruturaLista(); // CHAMA A NOVA REGRA DE LISTA AQUI!
+    } else if (lookahead.tipo == DELIMITADOR && strcmp(lookahead.lexema, "(") == 0) {
+        consome(DELIMITADOR); 
+        expressao();
+        if (strcmp(lookahead.lexema, ")") == 0) {
+            consome(DELIMITADOR); 
+        } else {
+            erroSintatico("Esperava ')' para fechar expressão.");
+        }
+    } else {
+        erroSintatico("Fator inválido na expressão.");
+    }
+}
+
+// Regra: ListaExpressoes -> Expressao ( "," Expressao )*
+void listaExpressoes() {
+    expressao();
+    while (lookahead.tipo == DELIMITADOR && strcmp(lookahead.lexema, ",") == 0) {
+        consome(DELIMITADOR);
+        expressao();
+    }
+}
+
+// Regra: Condicional -> "if" Expressao ":" Comando ( "else" ":" Comando )?
+void condicional() {
+    consome(PALAVRA_RESERVADA); // if
+    expressao();
+    if (strcmp(lookahead.lexema, ":") == 0) {
+        consome(PONTUACAO);
+    } else {
+        erroSintatico("Esperava ':' apos a expressao do if.");
+    }
+    comando(); // No MiniPython, apenas um comando [cite: 61]
+
+    if (lookahead.tipo == PALAVRA_RESERVADA && strcmp(lookahead.lexema, "else") == 0) {
+        consome(PALAVRA_RESERVADA); // else
+        if (strcmp(lookahead.lexema, ":") == 0) {
+            consome(PONTUACAO);
+        } else {
+            erroSintatico("Esperava ':' apos o else.");
+        }
+        comando();
+    }
+}
+
+// Regra: Repeticao -> "while" Expressao ":" Comando | "for" ID "in" "range" "(" Exp ")" ":" Comando
+void repeticao() {
+    if (strcmp(lookahead.lexema, "while") == 0) {
+        consome(PALAVRA_RESERVADA);
+        expressao();
+        consome(PONTUACAO); // :
+        comando();
+    } else { // for
+        consome(PALAVRA_RESERVADA); // for
+        consome(IDENTIFICADOR);
+        
+        // 'in' é operador lógico, 'range' é palavra reservada
+        if (lookahead.tipo == OPERADOR_LOGICO && strcmp(lookahead.lexema, "in") == 0) {
+            consome(OPERADOR_LOGICO); 
+        } else {
+            erroSintatico("Esperava 'in' no comando for.");
+        }
+        
+        if (strcmp(lookahead.lexema, "range") == 0) {
+            consome(PALAVRA_RESERVADA);
+        } else {
+            erroSintatico("Esperava 'range' no comando for.");
+        }
+        
+        consome(DELIMITADOR); // (
+        expressao();
+        consome(DELIMITADOR); // )
+        consome(PONTUACAO);    // :
+        comando();
+    }
+}
+
+// Regra: ComandoInput -> ID "=" "input" "(" STRING_LITERAL ")"
+// Nota: Chamada dentro de atribuicao() quando detecta a palavra 'input'
+void comandoInput() {
+    consome(PALAVRA_RESERVADA); // input
+    consome(DELIMITADOR);       // (
+    if (lookahead.tipo == STRING_LITERAL) {
+        consome(STRING_LITERAL);
+    }
+    consome(DELIMITADOR);       // )
+}
+
+// Adicione esta função junto com as outras do sintático
+// Regra: Lista -> "[" ( Expressao ( "," Expressao )* )? "]"
+void estruturaLista() {
+    consome(DELIMITADOR); // consome o '['
+    
+    // Se não for lista vazia, tem elementos
+    if (strcmp(lookahead.lexema, "]") != 0) {
+        expressao();
+        while (lookahead.tipo == DELIMITADOR && strcmp(lookahead.lexema, ",") == 0) {
+            consome(DELIMITADOR);
+            expressao();
+        }
+    }
+    
+    // Agora tem que fechar com ']'
+    if (strcmp(lookahead.lexema, "]") == 0) {
+        consome(DELIMITADOR);
+    } else {
+        erroSintatico("Esperava ']' para fechar a lista.");
+    }
 }
