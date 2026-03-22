@@ -1,5 +1,5 @@
 PROJETO COMPILADORES - FASE 1 (Analisador Léxico e Sintático)
-Aluno: Matheus Veiga Bacetic Joaquim
+Aluno: Matheus Veiga Bacetic Joaquim, Beatriz Barbosa
 
 1. STATUS DO DESENVOLVIMENTO
 As Etapas 1, 2 e 3 foram concluídas com sucesso. O compilador é capaz de realizar a varredura léxica gerando o arquivo "saida_lexica.txt" e realizar a análise sintática descendente recursiva conforme a gramática definida, abortando a execução e exibindo a linha correta ao encontrar erros.
