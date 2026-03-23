@@ -1,6 +1,6 @@
 /* ===================================================================
  * PROJETO COMPILADORES - FASE 1 (Análise Léxica e Sintática)
- * * Aluno(s): Matheus Veiga Bacetic Joaquim RA: 10425638 | Beatriz Barbosa RA: 10354067
+ * * Aluno(s): Matheus Veiga Bacetic Joaquim RA: 10425638 | Beatriz Barbosa RA: 10354067 | Gabriel Pereira Faravola RA: 10427189
  * * Compilação: gcc -Wall -Wno-unused-result -g -Og compilador.c -o compilador
  * =================================================================== */
 
