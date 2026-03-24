@@ -495,31 +495,3 @@ def menu():
 if __name__ == "__main__":
     menu()
 
-# Script rápido para extrair a matriz limpa para o Graph Online
-def gerar_matriz_limpa(nome_arquivo="grafo.txt"):
-    with open(nome_arquivo, 'r', encoding='utf-8') as f:
-        linhas = [l.strip() for l in f.readlines() if l.strip()]
-
-    qtd_v = int(linhas[1])
-    matriz = [[0] * qtd_v for _ in range(qtd_v)]
-
-    linha_atual = 2 + qtd_v + 1 # Pula cabeçalho, vértices e a linha do total de arestas
-
-    while linha_atual < len(linhas):
-        partes = linhas[linha_atual].split()
-        if len(partes) >= 3:
-            u, v, peso = map(int, partes[:3])
-            matriz[u][v] = peso
-            matriz[v][u] = peso # Não-direcionado
-        linha_atual += 1
-
-    # Salva no formato exato que o Graph Online pede
-    with open("matriz_para_copiar.txt", "w", encoding='utf-8') as f:
-        for linha in matriz:
-            f.write(", ".join(map(str, linha)) + "\n")
-
-    print("[+] Arquivo 'matriz_para_copiar.txt' gerado com sucesso!")
-    print("    Abra este arquivo, copie tudo e cole no Graph Online.")
-
-if __name__ == "__main__":
-    gerar_matriz_limpa()
