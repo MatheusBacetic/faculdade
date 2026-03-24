@@ -270,28 +270,25 @@ Original file is located at
 #        Gabriel Pereira Faravola (10427189)
 # Síntese: Aplicação para modelagem e manipulação de um grafo de
 #          recomendação de jogos (Não-Direcionado, Ponderado nas Arestas)
-# Histórico:
-#   - 13/03 - Implementação do menu inicial
-#   - Atualização - Migração de Matriz para Lista de Adjacência para
-#     suportar 70+ vértices de forma legível e otimizada.
 # =======================================================================
 
 import os
 
 class GrafoRecomendacao:
+    """Classe que gerencia o grafo de jogos usando Lista de Adjacência."""
+
     def __init__(self):
-        self.tipo = 2  # 2 = Não orientado com peso na aresta
-        self.V = 0
-        self.rotulos = {}
-        # Lista de Adjacência: uma lista onde cada índice tem um dicionário {id_vizinho: peso}
+        self.tipo = 2  # 2 = Grafo não orientado com peso na aresta
+        self.V = 0     # Contador de vértices
+        self.rotulos = {} # Dicionário para mapear ID -> Nome do Jogo
+        # Lista de Adjacência: lista onde cada índice (ID) contém um dicionário {id_vizinho: peso}
         self.adj = []
 
-    # a) Ler dados do arquivo
-    # a) Ler dados do arquivo
     def ler_arquivo(self, nome_arquivo="grafo.txt"):
+        """Lê a estrutura do grafo a partir de um arquivo .txt formatado."""
         try:
             with open(nome_arquivo, 'r', encoding='utf-8') as f:
-                # Lê todas as linhas ignorando espaços em branco e linhas vazias
+                # Filtra linhas vazias para evitar erros de leitura
                 linhas = [l.strip() for l in f.readlines() if l.strip()]
 
             if len(linhas) < 2:
@@ -304,43 +301,33 @@ class GrafoRecomendacao:
             self.rotulos = {}
 
             linha_atual = 2
-
-            # 1. Lendo os vértices com segurança
+            # 1. Leitura dos Vértices (ID e Nome entre aspas)
             for _ in range(self.V):
                 if linha_atual < len(linhas):
                     partes = linhas[linha_atual].split('"')
                     id_v = int(partes[0].strip())
-                    # Se tiver nome entre aspas pega, se não, cria um genérico
                     nome = partes[1].strip() if len(partes) > 1 else f"Desconhecido {id_v}"
                     self.rotulos[id_v] = nome
                     linha_atual += 1
                 else:
-                    break # Se acabaram as linhas, para de ler
+                    break
 
-            # Verifica se ainda tem linhas para ler as arestas
+            # 2. Leitura das Arestas
             if linha_atual < len(linhas):
-                # Pula a linha que diz "quantas arestas tem"
-                linha_atual += 1
-
-                # 2. Lendo as arestas ATÉ O ARQUIVO ACABAR
+                linha_atual += 1 # Pula a linha que indica a contagem de arestas
                 num_arestas_lidas = 0
                 while linha_atual < len(linhas):
                     try:
                         u, v, peso = map(int, linhas[linha_atual].split())
-                        # Só adiciona se os IDs dos vértices existirem para não dar KeyError
                         if u < self.V and v < self.V:
                             self.adj[u][v] = peso
-                            self.adj[v][u] = peso  # Não direcionado
+                            self.adj[v][u] = peso # Simetria: u-v é o mesmo que v-u
                             num_arestas_lidas += 1
                     except ValueError:
-                        # Se a linha estiver mal formatada (ex: uma letra no lugar de número), ignora
-                        pass
+                        pass # Ignora linhas mal formatadas
                     linha_atual += 1
 
-            # Depois de ler de forma segura, atualiza o 'V' real caso o arquivo estivesse quebrado
             self.V = len(self.rotulos)
-            self.adj = self.adj[:self.V] # Garante que a lista de adjacência tenha o tamanho certo
-
             print(f"\n[+] Sucesso! Grafo carregado com {self.V} jogos e {num_arestas_lidas} conexões.")
 
         except FileNotFoundError:
@@ -348,14 +335,13 @@ class GrafoRecomendacao:
         except Exception as e:
             print(f"\n[-] Erro inesperado ao ler arquivo: {e}")
 
-    # b) Gravar dados no arquivo
     def gravar_arquivo(self, nome_arquivo="grafo.txt"):
+        """Exporta o estado atual do grafo de volta para o arquivo .txt."""
         try:
             arestas = []
             for u in range(self.V):
                 for v, peso in self.adj[u].items():
-                    # u <= v evita duplicar arestas no TXT (já que é não direcionado)
-                    if u <= v:
+                    if u <= v: # Evita duplicar a mesma aresta no arquivo texto
                         arestas.append((u, v, peso))
 
             with open(nome_arquivo, 'w', encoding='utf-8') as f:
@@ -370,235 +356,170 @@ class GrafoRecomendacao:
         except Exception as e:
             print(f"\n[-] Erro ao gravar arquivo: {e}")
 
-    # c) Inserir vértice
     def inserir_vertice(self, nome):
+        """Adiciona um novo jogo (vértice) ao grafo."""
         novo_id = self.V
-        self.adj.append({})  # Adiciona uma nova lista de adjacência vazia
+        self.adj.append({})
         self.rotulos[novo_id] = nome
         self.V += 1
         print(f"\n[+] Jogo '{nome}' inserido com ID {novo_id}.")
 
-    # d) Inserir aresta
     def inserir_aresta(self, u, v, peso):
+        """Cria uma conexão de similaridade (aresta) entre dois jogos."""
         if 0 <= u < self.V and 0 <= v < self.V:
             self.adj[u][v] = peso
             self.adj[v][u] = peso
-            print(f"\n[+] Conexão criada entre '{self.rotulos[u]}' e '{self.rotulos[v]}' (Similaridade: {peso}).")
+            print(f"\n[+] Conexão criada entre '{self.rotulos[u]}' e '{self.rotulos[v]}' (Peso: {peso}).")
         else:
             print("\n[-] IDs de vértices inválidos.")
 
-    # e) Remover vértice (Reordena os IDs nas Listas de Adjacência)
     def remover_vertice(self, id_v):
+        """Remove um jogo e ajusta todos os IDs subsequentes para manter a integridade."""
         if 0 <= id_v < self.V:
             nome = self.rotulos.pop(id_v)
-
-            # 1. Remove a lista de adjacência do vértice deletado
             self.adj.pop(id_v)
             self.V -= 1
 
-            # 2. Reordena os rótulos para tapar o "buraco"
+            # Reindexação dos rótulos
             for i in range(id_v, self.V):
                 self.rotulos[i] = self.rotulos.pop(i + 1)
 
-            # 3. Varre todas as listas de adjacência restantes para atualizar os IDs
+            # Reindexação das conexões na lista de adjacência
             for u in range(self.V):
                 nova_adj_u = {}
                 for v, peso in self.adj[u].items():
                     if v == id_v:
-                        continue  # Ignora a aresta que apontava para o vértice removido
+                        continue
                     elif v > id_v:
-                        nova_adj_u[v - 1] = peso  # Rebaixa o ID em 1
+                        nova_adj_u[v - 1] = peso # Diminui o ID do vizinho
                     else:
                         nova_adj_u[v] = peso
                 self.adj[u] = nova_adj_u
 
-            print(f"\n[+] Jogo '{nome}' (antigo ID {id_v}) removido!")
-            print("[+] Lista de adjacência e IDs subsequentes reordenados automaticamente.")
+            print(f"\n[+] Jogo '{nome}' removido e IDs reordenados.")
         else:
             print("\n[-] ID inválido.")
 
-    # f) Remover aresta
     def remover_aresta(self, u, v):
+        """Remove a conexão entre dois jogos específicos."""
         if 0 <= u < self.V and 0 <= v < self.V:
             if v in self.adj[u]:
                 del self.adj[u][v]
                 del self.adj[v][u]
-                print(f"\n[+] Conexão entre '{self.rotulos[u]}' e '{self.rotulos[v]}' foi desfeita.")
+                print(f"\n[+] Conexão entre '{self.rotulos[u]}' e '{self.rotulos[v]}' removida.")
             else:
-                print("\n[-] Não existe conexão entre estes jogos.")
-        else:
-            print("\n[-] IDs inválidos.")
+                print("\n[-] Conexão não encontrada.")
 
-    # g) Mostrar conteúdo do arquivo (Formato Visualmente Atraente e Seguro)
     def mostrar_arquivo(self, nome_arquivo="grafo.txt"):
-        print(f"\n{'='*50}")
-        print(f"📄 CONTEÚDO DO ARQUIVO: {nome_arquivo}")
-        print(f"{'='*50}")
+        """Exibe o conteúdo bruto e formatado do arquivo de persistência."""
+        print(f"\n{'='*50}\n📄 CONTEÚDO DO ARQUIVO: {nome_arquivo}\n{'='*50}")
         try:
             with open(nome_arquivo, 'r', encoding='utf-8') as f:
-                # Lê o arquivo ignorando linhas totalmente em branco
                 linhas = [l.strip() for l in f.readlines() if l.strip()]
 
-            if len(linhas) < 2:
-                print("[-] O arquivo está vazio ou incompleto.")
-                return
-
-            tipo = linhas[0]
-            qtd_v = int(linhas[1])
-
-            print(f"📌 TIPO DO GRAFO: {tipo} (Não-Direcionado Ponderado)")
-            print(f"🎮 TOTAL DE VÉRTICES: {qtd_v}")
-            print("-" * 50)
+            if not linhas: return
+            print(f"📌 TIPO: {linhas[0]} | 🎮 VÉRTICES: {linhas[1]}")
 
             linha_atual = 2
-            # Lê os vértices de forma segura, evitando erro de limite
-            for _ in range(qtd_v):
+            for _ in range(int(linhas[1])):
                 if linha_atual < len(linhas):
                     print(f"   {linhas[linha_atual]}")
                     linha_atual += 1
 
             if linha_atual < len(linhas):
-                qtd_a = linhas[linha_atual]
-                print("-" * 50)
-                print(f"🔗 TOTAL DE ARESTAS: {qtd_a}")
-                print("-" * 50)
+                print(f"🔗 ARESTAS: {linhas[linha_atual]}")
                 linha_atual += 1
-
-                # Varre o resto do arquivo de forma segura (sem depender do número qtd_a)
                 while linha_atual < len(linhas):
-                    partes = linhas[linha_atual].split()
-                    if len(partes) >= 3:
-                        print(f"   ID {partes[0]:<2} <---> ID {partes[1]:<2} | Peso: {partes[2]}")
-                    else:
-                        print(f"   {linhas[linha_atual]}") # Fallback caso a linha esteja mal formatada
+                    print(f"   {linhas[linha_atual]}")
                     linha_atual += 1
-
-        except FileNotFoundError:
-            print("[-] Arquivo não encontrado. Grave os dados primeiro.")
         except Exception as e:
-            # Se algo der muito errado, ele imprime o formato original bruto para não travar
-            print(f"[-] Erro ao formatar: {e}")
-            print("\n--- Conteúdo Bruto ---")
-            with open(nome_arquivo, 'r', encoding='utf-8') as f:
-                print(f.read())
+            print(f"[-] Erro ao ler: {e}")
         print(f"{'='*50}")
 
-    # h) Mostrar grafo (LISTA DE ADJACÊNCIA FORMATADA)
     def mostrar_grafo(self):
-        if self.V == 0:
-            print("\n[-] O grafo está vazio.")
-            return
-
-        print("\n--- LISTA DE ADJACÊNCIA (SIMILARIDADE DE JOGOS) ---")
+        """Exibe a lista de adjacência de forma legível no console."""
+        if self.V == 0: return print("\n[-] Grafo vazio.")
+        print("\n--- LISTA DE ADJACÊNCIA ---")
         for i in range(self.V):
-            nome = self.rotulos.get(i, f"V{i}")
-            conexoes = []
+            conexoes = [f"[{v}: {self.rotulos[v]} (p:{p})]" for v, p in sorted(self.adj[i].items())]
+            print(f"{i:02d} | {self.rotulos[i]:<20} -> {' -> '.join(conexoes) if conexoes else '(Isolado)'}")
 
-            # Ordena pelos IDs dos vizinhos para ficar bonito na tela
-            for vizinho, peso in sorted(self.adj[i].items()):
-                nome_viz = self.rotulos.get(vizinho, f"V{vizinho}")
-                conexoes.append(f"[{vizinho}: {nome_viz} (peso {peso})]")
-
-            if conexoes:
-                print(f"{i:02d} | {nome[:20]:<20} -> " + " -> ".join(conexoes))
-            else:
-                print(f"{i:02d} | {nome[:20]:<20} -> (Isolado / Nenhuma conexão)")
-
-    # i) Conexidade (Busca de Componentes Conexas)
     def verificar_conexidade(self):
-        if self.V == 0:
-            print("\n[-] O grafo está vazio.")
-            return
-
+        """Usa Busca em Largura (BFS) para identificar componentes conexas."""
+        if self.V == 0: return
         visitados = [False] * self.V
         componentes = []
 
         for i in range(self.V):
             if not visitados[i]:
-                componente_atual = []
+                comp = []
                 fila = [i]
                 visitados[i] = True
-
                 while fila:
-                    no = fila.pop(0)
-                    componente_atual.append(self.rotulos[no])
+                    u = fila.pop(0)
+                    comp.append(self.rotulos[u])
+                    for v in self.adj[u]:
+                        if not visitados[v]:
+                            visitados[v] = True
+                            fila.append(v)
+                componentes.append(comp)
 
-                    # Varre apenas os vizinhos reais na lista de adjacência
-                    for vizinho in self.adj[no].keys():
-                        if not visitados[vizinho]:
-                            visitados[vizinho] = True
-                            fila.append(vizinho)
-
-                componentes.append(componente_atual)
-
-        print("\n📊 ANÁLISE DE CONEXIDADE DA REDE:")
-        if len(componentes) == 1:
-            print("[+] Resultado: GRAFO CONEXO.")
-            print("    A rede está 100% interligada. É possível alcançar qualquer jogo a partir de outro.")
-        else:
-            print(f"[-] Resultado: GRAFO DESCONEXO ({len(componentes)} componentes separadas).")
-            print("    A rede está fragmentada. Grupos isolados encontrados:")
-            for idx, comp in enumerate(componentes, 1):
-                print(f"    -> Componente {idx} ({len(comp)} jogos): {', '.join(comp[:5])}{'...' if len(comp)>5 else ''}")
+        print(f"\n📊 CONEXIDADE: {'CONEXO' if len(componentes) == 1 else 'DESCONEXO'}")
+        print(f"   Total de componentes: {len(componentes)}")
 
 def menu():
+    """Interface de usuário via terminal."""
     sistema = GrafoRecomendacao()
     while True:
-        print("\n=======================================================")
-        print(" 🎮 SISTEMA DE RECOMENDAÇÃO DE JOGOS (GRAFOS) 🎮 ")
-        print("=======================================================")
-        print("a) Ler dados do arquivo grafo.txt")
-        print("b) Gravar dados no arquivo grafo.txt")
-        print("c) Inserir vértice (Novo Jogo)")
-        print("d) Inserir aresta (Conectar Jogos)")
-        print("e) Remover vértice (Deletar Jogo)")
-        print("f) Remover aresta (Desfazer Conexão)")
-        print("g) Mostrar conteúdo do arquivo")
-        print("h) Mostrar grafo (Lista de Adjacência)")
-        print("i) Apresentar a conexidade do grafo")
-        print("j) Encerrar a aplicação")
+        print("\na) Ler arquivo | b) Gravar | c) +Vértice | d) +Aresta | e) -Vértice")
+        print("f) -Aresta  | g) Ver Arq | h) Ver Grafo | i) Conexidade | j) Sair")
 
-        opcao = input("\nEscolha sua ação: ").lower()
-
-        if opcao == 'a':
-            sistema.ler_arquivo()
-        elif opcao == 'b':
-            sistema.gravar_arquivo()
-        elif opcao == 'c':
-            nome = input("Digite o nome do novo jogo: ")
-            sistema.inserir_vertice(nome)
-        elif opcao == 'd':
-            try:
-                u = int(input("ID do primeiro jogo: "))
-                v = int(input("ID do segundo jogo: "))
-                peso = int(input("Quantidade de tags em comum (peso): "))
-                sistema.inserir_aresta(u, v, peso)
-            except ValueError:
-                print("[-] Erro: Digite apenas números inteiros para IDs e Peso.")
-        elif opcao == 'e':
-            try:
-                id_v = int(input("ID do jogo a ser removido: "))
-                sistema.remover_vertice(id_v)
-            except ValueError:
-                print("[-] Erro: Digite um ID numérico válido.")
-        elif opcao == 'f':
-            try:
-                u = int(input("ID do primeiro jogo: "))
-                v = int(input("ID do segundo jogo: "))
-                sistema.remover_aresta(u, v)
-            except ValueError:
-                print("[-] Erro: Digite IDs numéricos válidos.")
-        elif opcao == 'g':
-            sistema.mostrar_arquivo()
-        elif opcao == 'h':
-            sistema.mostrar_grafo()
-        elif opcao == 'i':
-            sistema.verificar_conexidade()
-        elif opcao == 'j':
-            print("\nEncerrando o programa... Obrigado por usar o sistema!\n")
-            break
-        else:
-            print("\n[-] Opção inválida, tente de novo!")
+        op = input("\nEscolha: ").lower()
+        if op == 'a': sistema.ler_arquivo()
+        elif op == 'b': sistema.gravar_arquivo()
+        elif op == 'c': sistema.inserir_vertice(input("Nome: "))
+        elif op == 'd':
+            try: sistema.inserir_aresta(int(input("ID1: ")), int(input("ID2: ")), int(input("Peso: ")))
+            except: print("Erro: use números.")
+        elif op == 'e':
+            try: sistema.remover_vertice(int(input("ID: ")))
+            except: print("Erro: use número.")
+        elif op == 'f':
+            try: sistema.remover_aresta(int(input("ID1: ")), int(input("ID2: ")))
+            except: print("Erro: use números.")
+        elif op == 'g': sistema.mostrar_arquivo()
+        elif op == 'h': sistema.mostrar_grafo()
+        elif op == 'i': sistema.verificar_conexidade()
+        elif op == 'j': break
 
 if __name__ == "__main__":
     menu()
+
+# Script rápido para extrair a matriz limpa para o Graph Online
+def gerar_matriz_limpa(nome_arquivo="grafo.txt"):
+    with open(nome_arquivo, 'r', encoding='utf-8') as f:
+        linhas = [l.strip() for l in f.readlines() if l.strip()]
+
+    qtd_v = int(linhas[1])
+    matriz = [[0] * qtd_v for _ in range(qtd_v)]
+
+    linha_atual = 2 + qtd_v + 1 # Pula cabeçalho, vértices e a linha do total de arestas
+
+    while linha_atual < len(linhas):
+        partes = linhas[linha_atual].split()
+        if len(partes) >= 3:
+            u, v, peso = map(int, partes[:3])
+            matriz[u][v] = peso
+            matriz[v][u] = peso # Não-direcionado
+        linha_atual += 1
+
+    # Salva no formato exato que o Graph Online pede
+    with open("matriz_para_copiar.txt", "w", encoding='utf-8') as f:
+        for linha in matriz:
+            f.write(", ".join(map(str, linha)) + "\n")
+
+    print("[+] Arquivo 'matriz_para_copiar.txt' gerado com sucesso!")
+    print("    Abra este arquivo, copie tudo e cole no Graph Online.")
+
+if __name__ == "__main__":
+    gerar_matriz_limpa()
