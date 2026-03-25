@@ -5,7 +5,9 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <time.h>
+#include <strings.h>
 #include "jogo.h"
+#define _POSIX_C_SOURCE 200809L
 
 // Estruturas para organizar os dados da partida
 typedef struct {
