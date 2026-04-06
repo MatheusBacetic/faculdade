@@ -1,1 +1,15 @@
-Análise Sintática concluída com sucesso!
+1# IDENTIFICADOR | numero
+1# DELIMITADOR | =
+1# NUMERO_INTEIRO | 100
+2# IDENTIFICADOR | fator
+2# DELIMITADOR | =
+2# NUMERO_INTEIRO | 2
+3# IDENTIFICADOR | resultado
+3# DELIMITADOR | =
+3# IDENTIFICADOR | numero
+3# OPERADOR_ARITMETICO | *
+3# IDENTIFICADOR | fator
+4# PALAVRA_RESERVADA | print
+4# DELIMITADOR | (
+4# IDENTIFICADOR | resultado
+ERRO LÉXICO na linha 4: @
