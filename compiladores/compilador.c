@@ -1,6 +1,6 @@
 /* ===================================================================
  * PROJETO COMPILADORES - FASE 1 (Análise Léxica e Sintática)
- * Alunos: Matheus Veiga Bacetic RA: 10425638 | Beatriz Barbosa RA: 10354067 | Gabriel Pereira Faravola RA: 10427189
+ * Alunos: Matheus Veiga Bacetic RA: 10425638 | Gabriel Pereira Faravola RA: 10427189
  * Compilação: gcc -Wall -Wno-unused-result -g -Og compilador.c -o compilador
  * =================================================================== */
 
@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+
+#define Total_IDs 1000
 
 // Definição dos tipos de átomos (tokens) reconhecidos pelo analisador léxico
 typedef enum {
@@ -38,9 +40,13 @@ FILE *saida;           // Arquivo de saída para tokens
 int linhaAtual = 1;    // Contador de linhas atual
 TInfoAtomo lookahead;  // Token atual sendo analisado
 
+char tabela_simbolos[Total_IDs][100];
+int qtd_ids = 0;
+
+
 // Protótipos das funções léxicas
 void iniciarAnalisador(char *nomeArquivo);
-TInfoAtomo motor_lexico(); // Função principal do analisador léxico
+TInfoAtomo analisadorLexico(); // Função principal do analisador léxico
 TInfoAtomo obter_atomo(); // Wrapper que imprime e retorna o token
 void imprimirToken(TInfoAtomo token);
 void fecharAnalisador();
@@ -51,8 +57,7 @@ TAtomo classificarLexema(char *lexema);
 // Protótipos das funções sintáticas
 void consome(TAtomo tipo_esperado);
 void erroSintatico(char *mensagem);
-void programa();
-void comando();
+void instrucao();
 void atribuicao();
 void comandoPrint();
 void comandoInput();
@@ -60,11 +65,28 @@ void condicional();
 void repeticao();
 void listaExpressoes();
 void expressao();
-void expRelacional(); // Adicione isso junto aos outros protótipos
+void expRelacional();
 void expSimples();
 void termo();
 void fator();
 void estruturaLista();
+
+int obterIdIdentificador(char *lexema) {
+    for (int i = 0; i < qtd_ids; i++) {
+        if (strcmp(tabela_simbolos[i], lexema) == 0) {
+            return i + 1; // ID começa em 1
+        }
+    }
+
+    strcpy(tabela_simbolos[qtd_ids], lexema);
+    qtd_ids++;
+
+    return qtd_ids;
+}
+
+
+
+
 
 // Função principal: inicializa o analisador, processa o arquivo e finaliza
 int main(int argc, char *argv[]) {
@@ -79,7 +101,9 @@ int main(int argc, char *argv[]) {
     lookahead = obter_atomo();
     
     // Inicia a análise sintática a partir da regra programa
-    programa();
+    while (lookahead.tipo != EOS) {
+        instrucao();
+    }
     
     // Verifica se a análise terminou corretamente
     if (lookahead.tipo == EOS) {
@@ -92,6 +116,11 @@ int main(int argc, char *argv[]) {
     fecharAnalisador();
     return 0;
 }
+
+
+
+
+
 
 // Inicializa o analisador abrindo os arquivos necessários
 void iniciarAnalisador(char *nomeArquivo) {
@@ -131,8 +160,15 @@ void erroLexico(char *lexema) {
 void imprimirToken(TInfoAtomo atomo) {
     char* nomeTipo = nomeDoTipo(atomo.tipo);
     
-    printf("%d# %s | %s\n", atomo.linha, nomeTipo, atomo.lexema);
-    fprintf(saida, "%d# %s | %s\n", atomo.linha, nomeTipo, atomo.lexema);
+    if (atomo.tipo == IDENTIFICADOR) {
+        int id = obterIdIdentificador(atomo.lexema);
+
+        printf("%d# %s | %d\n", atomo.linha, nomeTipo, id);
+        fprintf(saida, "%d# %s | %d\n", atomo.linha, nomeTipo, id);
+    } else {
+        printf("%d# %s | %s\n", atomo.linha, nomeTipo, atomo.lexema);
+        fprintf(saida, "%d# %s | %s\n", atomo.linha, nomeTipo, atomo.lexema);
+    }
 }
 
 // Converte o enum do tipo para string legível
@@ -152,8 +188,17 @@ char* nomeDoTipo(TAtomo tipo) {
     }
 }
 
+TInfoAtomo obter_atomo() {
+    TInfoAtomo atomo = analisadorLexico();
+    
+    if (atomo.tipo != EOS && atomo.tipo != ERRO) {
+        imprimirToken(atomo);
+    }
+    
+    return atomo;
+}
 // Função principal do analisador léxico: lê caracteres e identifica tokens
-TInfoAtomo motor_lexico() {
+TInfoAtomo analisadorLexico() {
     TInfoAtomo atomo;
     atomo.tipo = ERRO; 
     atomo.lexema[0] = '\0';
@@ -188,9 +233,9 @@ TInfoAtomo motor_lexico() {
 
     // Reconhece números inteiros
     if (isdigit(c)) {
-        atomo.lexema[i++] = c;
-        while (isdigit(c = fgetc(fonte))) {
-            atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
+        while ((c = fgetc(fonte)) != EOF && isdigit(c)) {
+            if (i < 99) atomo.lexema[i++] = c;
         }
         ungetc(c, fonte); 
         atomo.lexema[i] = '\0'; 
@@ -200,9 +245,9 @@ TInfoAtomo motor_lexico() {
 
     // Reconhece identificadores e palavras reservadas
     if (isalpha(c) || c == '_') {
-        atomo.lexema[i++] = c;
-        while (isalnum(c = fgetc(fonte)) || c == '_') {
-            atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
+        while ((c = fgetc(fonte)) != EOF && (isalnum(c) || c == '_')){
+            if (i < 99) atomo.lexema[i++] = c;
         }
         ungetc(c, fonte); 
         atomo.lexema[i] = '\0'; 
@@ -214,14 +259,14 @@ TInfoAtomo motor_lexico() {
     // Reconhece strings literais
     if (c == '"' || c == '\'') {
         char delimitador_string = c; 
-        atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
         
         while ((c = fgetc(fonte)) != delimitador_string && c != EOF && c != '\n') {
-            atomo.lexema[i++] = c;
+            if (i < 99) atomo.lexema[i++] = c;
         }
         
         if (c == delimitador_string) {
-            atomo.lexema[i++] = c; 
+            if (i < 99) atomo.lexema[i++] = c; 
             atomo.lexema[i] = '\0';
             atomo.tipo = STRING_LITERAL;
         } else {
@@ -233,11 +278,11 @@ TInfoAtomo motor_lexico() {
 
     // Reconhece operadores relacionais e atribuição
     if (c == '=' || c == '<' || c == '>' || c == '!') {
-        atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
         char prox = fgetc(fonte); 
         
         if (prox == '=') {
-            atomo.lexema[i++] = prox;
+            if (i < 99) atomo.lexema[i++] = prox;
             atomo.lexema[i] = '\0';
             atomo.tipo = OPERADOR_RELACIONAL; 
             return atomo;
@@ -258,12 +303,12 @@ TInfoAtomo motor_lexico() {
 
     // Reconhece operadores aritméticos
     if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
-        atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
         
         if (c == '*') {
             char prox = fgetc(fonte);
             if (prox == '*') {
-                atomo.lexema[i++] = prox; 
+                if (i < 99) atomo.lexema[i++] = prox; 
             } else {
                 ungetc(prox, fonte); 
             }
@@ -276,7 +321,7 @@ TInfoAtomo motor_lexico() {
 
     // Reconhece delimitadores
     if (c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == ',') {
-        atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
         atomo.lexema[i] = '\0';
         atomo.tipo = DELIMITADOR;
         return atomo;
@@ -284,7 +329,7 @@ TInfoAtomo motor_lexico() {
     
     // Reconhece pontuação
     if (c == ':') {
-        atomo.lexema[i++] = c;
+        if (i < 99) atomo.lexema[i++] = c;
         atomo.lexema[i] = '\0';
         atomo.tipo = PONTUACAO;
         return atomo;
@@ -300,15 +345,6 @@ TInfoAtomo motor_lexico() {
 }
 
 // Wrapper para obter token, imprimir se válido e retornar
-TInfoAtomo obter_atomo() {
-    TInfoAtomo atomo = motor_lexico();
-    
-    if (atomo.tipo != EOS && atomo.tipo != ERRO) {
-        imprimirToken(atomo);
-    }
-    
-    return atomo;
-}
 
 // Classifica lexemas como identificadores, palavras reservadas ou booleanos
 TAtomo classificarLexema(char *lexema) {
@@ -360,15 +396,8 @@ void consome(TAtomo tipo_esperado) {
     }
 }
 
-// Regra gramatical: Programa -> Comando*
-void programa() {
-    while (lookahead.tipo != EOS) {
-        comando();
-    }
-}
-
-// Regra: Comando -> Atribuição | Condicional | Repetição | Print | Input | Return
-void comando() {
+// Regra: instrucao -> Atribuição | Condicional | Repetição | Print | Input | Return
+void instrucao() {
     if (lookahead.tipo == IDENTIFICADOR) {
         atribuicao();
     } else if (lookahead.tipo == PALAVRA_RESERVADA) {
@@ -545,7 +574,7 @@ void condicional() {
     } else {
         erroSintatico("Esperava ':' após a expressão do if.");
     }
-    comando();
+    instrucao();
 
     if (lookahead.tipo == PALAVRA_RESERVADA && strcmp(lookahead.lexema, "else") == 0) {
         consome(PALAVRA_RESERVADA);
@@ -554,7 +583,7 @@ void condicional() {
         } else {
             erroSintatico("Esperava ':' após o else.");
         }
-        comando();
+        instrucao();
     }
 }
 
@@ -564,7 +593,7 @@ void repeticao() {
         consome(PALAVRA_RESERVADA);
         expressao();
         consome(PONTUACAO);
-        comando();
+        instrucao();
     } else {
         consome(PALAVRA_RESERVADA);
         consome(IDENTIFICADOR);
@@ -585,7 +614,7 @@ void repeticao() {
         expressao();
         consome(DELIMITADOR);
         consome(PONTUACAO);
-        comando();
+        instrucao();
     }
 }
 
@@ -617,4 +646,3 @@ void estruturaLista() {
         erroSintatico("Esperava ']' para fechar a lista.");
     }
 }
-
