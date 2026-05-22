@@ -1,15 +1,23 @@
 # -*- coding: utf-8 -*-
 
-# ===============================================================================
-# Título: Similaridade de generos para Recomendação de Jogos Digitais
+# ======================================================================================================
 
+# Título: Similaridade de generos para Recomendação de Jogos Digitais
+#
 # Integrantes: Beatriz Aparecida de Mello Barbosa - RA: 10354067
 #              Gabriel Pereira Faravola - RA: 10427189
 #              Matheus Veiga Bacetic Joaquim - RA: 10425638
 #
 # Síntese: Aplicação para modelagem e manipulação de um grafo de
 #          recomendação de jogos (Não-Direcionado, Ponderado nas Arestas)
-# ===============================================================================
+# ======================================================================================================
+#
+# Novas implementações: 
+#
+#     Foram adicionadas duas opções ao menu: recomendação de jogos por similaridade de gêneros e 
+#     análise de propriedades estruturais do grafo, cobrindo conectividade, euler, coloração e hamilton.
+#
+# ======================================================================================================
 
 import kagglehub
 import pandas as pd
@@ -272,19 +280,12 @@ class GrafoRecomendacao:
             print(f"{self.rotulos[jogos_similares[i][0]]} ({jogos_similares[i][1]} generos em comum)")
     
     def analisar_propriedades(self):
-        #Analisa coloração, graus, Euler e Hamilton do grafo
         if self.V == 0:
             return print("\n[-] Grafo vazio.")
 
         graus = [len(self.adj[i]) for i in range(self.V)]
 
-        print("\nGRAUS DOS VÉRTICES")
-        print(f"   Mínimo: {min(graus)}  |  Máximo: {max(graus)}  |  Médio: {sum(graus)/self.V:.2f}")
-        top5 = sorted(range(self.V), key=lambda i: graus[i], reverse=True)[:5]
-        print("   Top-5:")
-        for i in top5:
-            print(f"      [{i:02d}] {self.rotulos[i]:<30} grau={graus[i]}")
-
+        # Conectividade (auxiliar)
         visitados = [False] * self.V
         fila = [next((i for i in range(self.V) if graus[i] > 0), 0)]
         visitados[fila[0]] = True
@@ -299,12 +300,12 @@ class GrafoRecomendacao:
         impares = sum(1 for g in graus if g % 2 != 0)
         print("\nEULER")
         if conexo and impares == 0:
-            print("   ✅ Admite circuito euleriano")
+            print("   Admite circuito euleriano")
         elif conexo and impares == 2:
-            print("   ✅ Admite percurso euleriano (não-fechado)")
+            print("   Admite percurso euleriano (não-fechado)")
         else:
             motivo = "grafo desconexo" if not conexo else f"{impares} vértices de grau ímpar"
-            print(f"   ❌ Não euleriano ({motivo})")
+            print(f"  Não euleriano ({motivo})")
 
         cor = [-1] * self.V
         for u in sorted(range(self.V), key=lambda i: graus[i], reverse=True):
@@ -313,9 +314,8 @@ class GrafoRecomendacao:
             while c in usadas:
                 c += 1
             cor[u] = c
-        num_cores = max(cor) + 1
         print(f"\nCOLORAÇÃO")
-        print(f"   χ ≈ {num_cores} cores — {num_cores} partições independentes")
+        print(f"   χ ≈ {max(cor) + 1} cores — {max(cor) + 1} partições independentes")
 
         dirac = all(g >= self.V / 2 for g in graus)
         ore = all(
@@ -325,15 +325,15 @@ class GrafoRecomendacao:
         )
         print("\nHAMILTON")
         if self.V < 3:
-            print("   ⚠️  Vértices insuficientes (mínimo 3)")
+            print("   Vértices insuficientes (mínimo 3)")
         elif dirac or ore:
-            print("   ✅ Admite ciclo hamiltoniano (Dirac ou Ore satisfeito)")
-            print("      → Também admite percurso hamiltoniano")
+            print("   Admite ciclo hamiltoniano (Dirac ou Ore satisfeito)")
+            print("    → Também admite percurso hamiltoniano")
         elif conexo:
-            print("   ⚠️  Condições suficientes não satisfeitas — inconclusivo")
-            print("      (verificação exata é NP-completo)")
+            print("   Condições suficientes não satisfeitas — inconclusivo")
+            print("   (verificação exata é NP-completo)")
         else:
-            print("   ❌ Não hamiltoniano (grafo desconexo)")
+            print("   Não hamiltoniano (grafo desconexo)")
 
 def menu():
     sistema = GrafoRecomendacao()
